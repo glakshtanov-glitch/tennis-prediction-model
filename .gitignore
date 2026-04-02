@@ -1,0 +1,30 @@
+# R environment snapshots — too large for git
+*.RData
+*.rda
+
+# Saved model objects — regenerate with retrain scripts
+*.rds
+
+# API keys and secrets — never commit
+.Renviron
+.env
+*.env
+
+# CSV data files — raw data and backtest outputs
+*.csv
+
+# Plots / generated images — regenerate with calibration.R
+*.png
+*.pdf
+*.typ
+
+# R session artefacts
+.Rhistory
+.Rapp.history
+.Rproj.user/
+*.Rproj.user
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
