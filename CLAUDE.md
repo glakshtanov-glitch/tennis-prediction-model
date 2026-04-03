@@ -27,6 +27,7 @@ source("model.R")          # model fit/eval helpers
 source("backtest.R")       # backtesting pipeline
 source("live_predict.R")   # live prediction pipeline (uses model_inter3_elo)
 source("ss_rule.R")        # straight-set streak rule
+source("tracking.R")       # bet logging and P&L tracking
 ```
 
 For live use, also load the saved artefacts:
@@ -186,13 +187,30 @@ Rscript fetch_and_report.R
 
 **Output columns:** `fetched_at, tournament, playerA, playerB, surface, rankA, rankB, eloA, eloB, elo_diff_surface, games_dom_diff, games_dom_x_underdog, ss_streakA, ss_streakB, prob_A, prob_B, odds_A, odds_B, implied_A, implied_B, edge_A, high_confidence_flag, ss_signal`
 
+## Design Decisions
+
+Key architectural choices and their empirical justification. Do not revisit without new evidence.
+
+**Logistic regression over XGBoost:** `model_xgb` (XGBoost on the `model_wform` feature set) was tested and did not outperform `model_inter3_elo`. With only 3,651 training rows after NA-filtering for Elo features, logistic regression generalises better than gradient boosting on small data; its linear decision boundary is also more stable in the sparse tail region where the betting rule operates.
+
+**Upper edge cap rejected:** An `edge < 0.50` cap was explicitly tested. The 13 removed bets (edge ≥ 0.50) had 61.5% win rate and +171% ROI vs 15.8% implied — the best-performing subset of the 94. At extreme edges, the model is overconfident in raw probability, but the market's error is proportionally larger. Removing these bets discards genuine signal. Consequence: `HIGH_CONF_EDGE_CAP <- Inf`.
+
+**Platt scaling not applied to live predictions:** Platt coefficients A=0.987, B=0.000 (near identity) when fitted on 5-fold CV of `train_inter`. The +16.3pp miscalibration in the betting zone is localised to the feature-space tails (extreme rank ratios and Elo differences sparse in training data) — a covariate-shift problem that a global affine recalibration cannot fix. No improvement in REL or edge retention in the high-odds region. Scaler saved as `platt_scaler.rds` but not applied.
+
+**Odds not used as a model feature:** `odds_all` covers only 2020–2024; the training period is 2015–2019 with no odds coverage. Including market odds as a model input would require either discarding 5 years of training data or training a model that cannot be evaluated on its own training set. Edge is computed post-prediction as `p̂ − implied`, keeping model signal and market signal cleanly separate.
+
 ## Null result experiments
 
 Features tested and discarded — do not re-test without new justification.
 
-| Feature | Script | AUC delta | ROI delta (edge>0.15) | Coefficient p | Verdict |
+| Feature / Approach | Script | AUC delta | ROI delta (edge>0.15) | Coefficient p | Verdict |
 |---------|--------|-----------|----------------------|---------------|---------|
-| `round_num` (ordinal R128=1…F=7) | `round_feature_experiment.R` | +0.0000 | +0.0% | p=0.942 | Discard |
+| `round_num` (ordinal R128=1…F=7) | `round_feature_experiment.R` | +0.0000 | +0.0% | p=0.942 | Discard — collinear with rank/Elo/games_dom |
+| XGBoost (`model_xgb`, `model_wform` features) | — | < 0.800 | < +62.5% | — | Discard — logistic generalises better on 3,651 train rows |
+| `wform_diff` (`model_wform`) | — | — | < inter3_elo | — | Deprecated — Elo captures form signal more stably; superseded |
+| Serve stats (1st serve%, aces, break points) | — | — | — | — | Discard — no incremental AUC beyond rank and Elo |
+| Age / trajectory | — | — | — | — | Discard — no predictive signal beyond rank and Elo |
+| `fatigue_diff` (standalone) | — | — | — | — | Discard — subsumed by games_dom; not in any retained model |
 
 **`round_num` (April 2026):** Tournament round encoded as integer 1–7 (R128→F). Coefficient = −0.002 (p = 0.942). AUC and ROI on 2020–2024 test set identical to baseline to 4 decimal places. The same 94 high-confidence bets are selected at the 0.15 threshold. Round is structurally correlated with rank/Elo/games_dom — it carries no independent predictive signal once those features are in the model.
 
