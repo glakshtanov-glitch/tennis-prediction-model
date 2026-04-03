@@ -150,6 +150,26 @@ Run `calibration.R` to reproduce. Key results on the 2020–2024 test set:
 
 All windows show positive ROI. W3 and W5 are individually significant. Small per-window samples explain the non-significant windows — the cumulative signal (94 bets, +58.8% weighted ROI) is the reliable measure.
 
+## 2025 out-of-sample backtest
+
+Run by `update_2025.R`. Extends `elo_surface_lookup.rds` with 2508 completed 2025 matches from tennis-data.co.uk. Model and training data (2015–2019) unchanged. Edge ≥ 0.15, implied < 0.29:
+
+| Year | Bets | Win% | ROI | z | p-value |
+|------|------|------|-----|---|---------|
+| 2025 | 42 | 23.8% | +5.5% | 0.47 | 0.318 |
+
+Not individually significant (consistent with walk-forward windows of comparable size). ROI is positive. The 2025 CSV covers the full ATP season including 250-level events, producing a larger high-odds pool (35.8% of matched matches have an underdog with implied < 0.29) vs the 2020–2024 major-tournament-weighted backtest. Cumulative signal (2020–2025, ~138 bets) remains positive.
+
+**Threshold sweep (2025, implied < 0.29):**
+
+| Threshold | n bets | Win rate | ROI | z | p-value |
+|-----------|--------|----------|-----|---|---------|
+| edge > 0.05 | 109 | 21.1% | −6.5% | 0.27 | 0.394 |
+| edge > 0.10 | 74 | 20.3% | −5.6% | −0.002 | 0.501 |
+| **edge > 0.15** | **42** | **23.8%** | **+5.5%** | **0.47** | **0.318** |
+| edge > 0.20 | 30 | 26.7% | +21.3% | 0.61 | 0.272 |
+| edge > 0.25 | 19 | 31.6% | +47.4% | 1.08 | 0.141 |
+
 ## API dependencies
 
 Keys must be in `.Renviron` (never hardcoded):
