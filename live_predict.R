@@ -159,7 +159,7 @@ predict_match <- function(playerA, playerB, surface, tournament_matches,
     odds_B               = odds_B
   )
 
-  # ── 6. Edge and high-confidence flag (only when odds supplied) ───────────────
+  # ── 6. Edge, high-confidence flag, and suggested stake (only when odds supplied)
   if (!is.na(odds_A) && !is.na(odds_B)) {
     overround  <- 1/odds_A + 1/odds_B
     implied_A  <- (1/odds_A) / overround   # overround-adjusted implied prob
@@ -167,12 +167,18 @@ predict_match <- function(playerA, playerB, surface, tournament_matches,
     edge_A     <- prob_A - implied_A
 
     result <- result %>% mutate(
-      implied_A          = round(implied_A, 4),
-      implied_B          = round(implied_B, 4),
-      edge_A             = round(edge_A, 4),
+      implied_A            = round(implied_A, 4),
+      implied_B            = round(implied_B, 4),
+      edge_A               = round(edge_A, 4),
       high_confidence_flag = edge_A > HIGH_CONF_EDGE &
                              edge_A < HIGH_CONF_EDGE_CAP &
-                             implied_A < HIGH_CONF_IMPLIED
+                             implied_A < HIGH_CONF_IMPLIED,
+      suggested_stake      = case_when(
+        !high_confidence_flag ~ NA_integer_,
+        edge_A >= 0.40        ~ 3L,
+        edge_A >= 0.25        ~ 2L,
+        TRUE                  ~ 1L
+      )
     )
   }
 
@@ -305,9 +311,11 @@ daily_report <- function(tournament_matches, fixtures_today) {
       edge       = sprintf("%+.3f", edge_A),
       odds       = sprintf("%.2f", odds_A),
       hc         = if_else(high_confidence_flag, "*** HC ***", ""),
+      stake      = if_else(high_confidence_flag,
+                           sprintf("%du", suggested_stake), ""),
       ss         = if_else(!is.na(ss_signal), "SS", "")
     ) %>%
-    select(match, surf, ranks, elo_d, prob, imp, edge, odds, hc, ss)
+    select(match, surf, ranks, elo_d, prob, imp, edge, odds, hc, stake, ss)
 
   print(as.data.frame(display), row.names = FALSE)
 
@@ -320,8 +328,8 @@ daily_report <- function(tournament_matches, fixtures_today) {
     ))
     hc_bets %>%
       mutate(label = sprintf(
-        "  BET ON: %-20s  prob=%.3f  implied=%.3f  edge=%+.3f  odds=%.2f  elo_diff=%+.0f",
-        playerA, prob_A, implied_A, edge_A, odds_A, elo_diff_surface
+        "  BET ON: %-20s  prob=%.3f  implied=%.3f  edge=%+.3f  odds=%.2f  elo_diff=%+.0f  stake=%du",
+        playerA, prob_A, implied_A, edge_A, odds_A, elo_diff_surface, suggested_stake
       )) %>%
       pull(label) %>%
       walk(cat, "\n")

@@ -348,9 +348,11 @@ run_combined_report <- function(all_completed, fixtures_today) {
         edge   = sprintf("%+.3f", edge_A),
         odds   = sprintf("%.2f", odds_A),
         hc     = if_else(high_confidence_flag, "*** HC ***", ""),
+        stake  = if_else(high_confidence_flag,
+                         sprintf("%du", suggested_stake), ""),
         ss     = if_else(!is.na(ss_signal), "SS", "")
       ) %>%
-      select(match, tourny, surf, ranks, elo_d, prob, imp, edge, odds, hc, ss)
+      select(match, tourny, surf, ranks, elo_d, prob, imp, edge, odds, hc, stake, ss)
     print(as.data.frame(display), row.names = FALSE)
   } else {
     display <- report %>%
@@ -378,8 +380,8 @@ run_combined_report <- function(all_completed, fixtures_today) {
       ))
       hc_bets %>%
         mutate(label = sprintf(
-          "  BET ON: %-20s  [%s]  prob=%.3f  implied=%.3f  edge=%+.3f  odds=%.2f  elo_diff=%+.0f",
-          playerA, tournament, prob_A, implied_A, edge_A, odds_A, elo_diff_surface
+          "  BET ON: %-20s  [%s]  prob=%.3f  implied=%.3f  edge=%+.3f  odds=%.2f  elo_diff=%+.0f  stake=%du",
+          playerA, tournament, prob_A, implied_A, edge_A, odds_A, elo_diff_surface, suggested_stake
         )) %>%
         pull(label) %>%
         walk(cat, "\n")
@@ -424,7 +426,7 @@ save_picks <- function(report, date_str = as.character(Sys.Date())) {
            ss_streakA, ss_streakB,
            prob_A, prob_B,
            any_of(c("odds_A", "odds_B", "implied_A", "implied_B",
-                     "edge_A", "high_confidence_flag")),
+                     "edge_A", "high_confidence_flag", "suggested_stake")),
            ss_signal)
 
   # Dated file — clean, single-run

@@ -110,6 +110,20 @@ saveRDS(model_inter3_elo, "model_inter3_elo.rds")
 save.image(file = "C:/Users/User/OneDrive/Documents/tennis_project.RData")
 ```
 
+## Staking Rules
+
+`suggested_stake` is computed in `predict_match()` (`live_predict.R`) and propagated to the daily report, the CSV output, and `log_bet()` in `tracking.R`. Only populated when `high_confidence_flag == TRUE`, otherwise `NA`.
+
+| Edge range | Stake | Rationale |
+|------------|-------|-----------|
+| 0.15–0.25 | 1 unit | Minimum threshold — edge validated but narrow |
+| 0.25–0.40 | 2 units | Stronger disagreement with market |
+| 0.40+ | 3 units | Extreme edge — historically best-performing subset (61.5% win, +171% ROI on 13 bets) |
+
+**These tiers are not optimised.** They are fixed round-number thresholds based on the qualitative finding that higher-edge bets outperform (see Design Decisions: upper edge cap rejected), not fitted to historical data. Kelly or fractional-Kelly sizing was not applied because the model's raw probabilities are overconfident in the betting zone (+16pp miscalibration); applying Kelly to inflated probabilities would oversize bets. The tiered structure is a conservative hand-coded approximation that sizes up proportionally to edge without relying on calibrated win probability estimates.
+
+`log_bet()` accepts `suggested_stake` directly from pipeline output. Pass it to let the function resolve stake automatically; override with an explicit `stake` argument if needed.
+
 ## Calibration findings
 
 Run `calibration.R` to reproduce. Key results on the 2020–2024 test set:

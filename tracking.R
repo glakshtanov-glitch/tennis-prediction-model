@@ -64,12 +64,18 @@ log_bet <- function(playerA,
                     implied_prob,
                     edge,
                     odds_taken,
-                    bookmaker    = "Bet365",
-                    stake        = 1,
-                    result       = NA_character_,
-                    notes        = NA_character_,
-                    date         = Sys.Date(),
-                    log_path     = BETS_LOG_PATH) {
+                    bookmaker       = "Bet365",
+                    suggested_stake = NA,
+                    stake           = NULL,
+                    result          = NA_character_,
+                    notes           = NA_character_,
+                    date            = Sys.Date(),
+                    log_path        = BETS_LOG_PATH) {
+
+  # Resolve stake: explicit > suggested_stake from pipeline > default 1
+  if (is.null(stake)) {
+    stake <- if (!is.na(suggested_stake)) as.numeric(suggested_stake) else 1
+  }
 
   if (!signal_type %in% c("HC", "SS", "both")) {
     stop("signal_type must be one of: 'HC', 'SS', 'both'")
@@ -256,18 +262,18 @@ if (FALSE) {
 
   # Log a bet at the time of placing it (result unknown yet)
   log_bet(
-    playerA      = "Tsitsipas S.",
-    playerB      = "Cerundolo F.",
-    tournament   = "Monte-Carlo Masters",
-    surface      = "Clay",
-    round        = "R32",
-    signal_type  = "HC",
-    model_prob   = 0.44,
-    implied_prob = 0.22,
-    edge         = 0.22,
-    odds_taken   = 4.50,
-    bookmaker    = "Bet365",
-    stake        = 1
+    playerA         = "Tsitsipas S.",
+    playerB         = "Cerundolo F.",
+    tournament      = "Monte-Carlo Masters",
+    surface         = "Clay",
+    round           = "R32",
+    signal_type     = "HC",
+    model_prob      = 0.44,
+    implied_prob    = 0.22,
+    edge            = 0.22,
+    odds_taken      = 4.50,
+    bookmaker       = "Bet365",
+    suggested_stake = 2   # from pipeline output (edge 0.22 → 2 units)
   )
 
   # After the match, fill in the result
