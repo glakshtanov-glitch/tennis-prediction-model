@@ -147,8 +147,9 @@ Run `calibration.R` to reproduce. Key results on the 2020–2024 test set:
 | W3 | 2021 | 17 | 47.1% | +77% | 0.013 |
 | W4 | 2022 | 22 | 31.8% | +40% | 0.110 |
 | W5 | 2023–24 | 47 | 36.2% | +58% | 0.003 |
+| 2025 OOS | 2025 | 42 | 23.8% | +5.5% | 0.318 |
 
-All windows show positive ROI. W3 and W5 are individually significant. Small per-window samples explain the non-significant windows — the cumulative signal (94 bets, +58.8% weighted ROI) is the reliable measure.
+Five of six windows show positive ROI. W3 and W5 are individually significant. Small per-window samples explain the non-significant windows — the cumulative sample is now 136 bets across 2020–2025.
 
 ## 2025 out-of-sample backtest
 

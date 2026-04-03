@@ -100,8 +100,9 @@ Model retrained from scratch in each window; test period held out entirely. Edge
 | W3 | 2021 | 17 | 47.1% | +77% | 0.013 |
 | W4 | 2022 | 22 | 31.8% | +40% | 0.110 |
 | W5 | 2023–2024 | 47 | 36.2% | +58% | 0.003 |
+| 2025 | 2025 | 42 | 23.8% | +5.5% | 0.318 |
 
-All four windows are positive ROI. Two are individually significant; cumulative z = 3.98.
+Five of six windows show positive ROI. Two are individually significant; cumulative z = 3.98. Cumulative sample is now 136 bets across 2020–2025.
 
 ---
 
