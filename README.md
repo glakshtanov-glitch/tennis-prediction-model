@@ -1,6 +1,6 @@
 # ATP Tennis Prediction Model
 
-Logistic regression model that identifies statistically significant edges on high-odds ATP underdogs. Trained on 2015–2019 Sackmann match data and validated out-of-sample on 2020–2024 (AUC 0.800, 94 high-confidence bets, +62.5% ROI, z = 3.98, p < 0.0001). The full pipeline is automated: a single `Rscript fetch_and_report.R` call fetches live rankings, current fixtures, and Bet365 odds, then outputs a ranked prediction file. First live deployment: Monte-Carlo Masters, April 2026 (clay).
+Logistic regression model that identifies statistically significant edges on high-odds ATP underdogs. Trained on 2015–2019 Sackmann match data and validated out-of-sample on 2020–2024 (AUC 0.801, 96 high-confidence bets, +62.7% ROI, z = 4.10, p < 0.0001). The full pipeline is automated: a single `Rscript fetch_and_report.R` call fetches live rankings, current fixtures, and Bet365 odds, then outputs a ranked prediction file. First live deployment: Monte-Carlo Masters, April 2026 (clay).
 
 ---
 
@@ -82,7 +82,7 @@ ODDS_API_KEY=your_key_here
 |-----------|--------|----------|-----|----------|---------|---------|
 | edge > 0.05 | 154 | 28.6% | +22.3% | — | — | 0.006 |
 | edge > 0.10 | 116 | 34.5% | +46.0% | 4.38 | 3.41 | 0.0002 |
-| **edge > 0.15** | **94** | **38.3%** | **+62.5%** | **4.54** | **3.98** | **<0.0001** |
+| **edge > 0.15** | **96** | **38.5%** | **+62.7%** | **4.99** | **4.10** | **<0.0001** |
 | edge > 0.20 | 76 | 39.5% | +68.0% | 4.72 | 3.62 | 0.0001 |
 | edge > 0.25 | 59 | 39.0% | +64.3% | 4.89 | 3.31 | 0.0004 |
 
