@@ -1,6 +1,6 @@
 # ATP Tennis Prediction Model
 
-Logistic regression model that identifies statistically significant edges on high-odds ATP underdogs. Trained on 2015–2019 Sackmann match data and validated out-of-sample on 2020–2024 (AUC 0.801, 96 high-confidence bets, +62.7% ROI, z = 4.10, p < 0.0001). The full pipeline is automated: a single `Rscript fetch_and_report.R` call fetches live rankings, current fixtures, and Bet365 odds, then outputs a ranked prediction file. First live deployment: Monte-Carlo Masters, April 2026 (clay).
+Logistic regression model that identifies statistically significant edges on high-odds ATP underdogs. Trained on 2015–2019 Sackmann match data and validated out-of-sample on 2020–2025 (AUC 0.801, 136 high-confidence bets, +62.7% ROI on the 2020–2024 core sample, z = 4.10, p < 0.0001). The full pipeline is automated: a single `Rscript fetch_and_report.R` call fetches live rankings, current fixtures, and Bet365 odds, then outputs a ranked prediction file. First live deployment: Monte-Carlo Masters, April 2026 (clay).
 
 ---
 
@@ -106,9 +106,34 @@ Five of six windows show positive ROI. Two are individually significant; cumulat
 
 ---
 
-## 6. Limitations
+## 6. Tournament and surface breakdown
 
-- **Small sample:** 94 bets over five years; variance is high and individual-year results fluctuate.
+`tournament_analysis.R` — 138 bets (2020–2025), edge > 0.15, implied < 0.29.
+
+**By tournament level:**
+
+| Level | Bets | Win rate | ROI |
+|-------|------|----------|-----|
+| Grand Slam | 36 | 36.1% | +58.2% |
+| Masters 1000 | 32 | 34.4% | +52.8% |
+| ATP 250 | 35 | 37.1% | +53.3% |
+| ATP 500 | 34 | 29.4% | +20.4% |
+
+**By surface:**
+
+| Surface | Bets | Win rate | ROI |
+|---------|------|----------|-----|
+| Hard | 67 | 37.3% | +54.6% |
+| Grass | 31 | 35.5% | +57.2% |
+| Clay | 40 | 27.5% | +20.4% |
+
+Clay underperforms Hard and Grass by ~35pp ROI; the edge exists on clay but is weaker, which is relevant for the live deployment beginning at Monte-Carlo.
+
+---
+
+## 8. Limitations
+
+- **Small sample:** 136 bets over six years; variance is high and individual-year results fluctuate.
 - **Calibration:** Model overestimates raw win probability in the betting zone by ~16pp; the validated edge is market-relative, not absolute.
 - **Odds availability:** The Odds API covers major tournaments; qualifying and smaller 250-level events may have no odds returned.
 - **Name normalisation:** Mismatches between SofaScore and Odds API player names can cause fixtures to run without odds (graceful degradation, not a crash).
@@ -116,7 +141,7 @@ Five of six windows show positive ROI. Two are individually significant; cumulat
 
 ---
 
-## 7. Project structure
+## 9. Project structure
 
 | File | Purpose |
 |------|---------|
@@ -129,6 +154,7 @@ Five of six windows show positive ROI. Two are individually significant; cumulat
 | `backtest.R` | Historical backtesting pipeline |
 | `walk_forward.R` | Walk-forward cross-validation |
 | `calibration.R` | Calibration analysis (REL, Platt scaling assessment) |
+| `tournament_analysis.R` | HC bet breakdown by tournament name, level, and surface |
 | `startup.R` | Session initialisation |
 | `model_inter3_elo.rds` | Saved primary model |
 | `elo_surface_lookup.rds` | Pre-computed surface Elo ratings (27k+ matches) |
