@@ -108,8 +108,8 @@ predict_match <- function(playerA, playerB, surface, tournament_matches,
   if (length(rankB) == 0) { cat("Ranking not found:", playerB, "\n"); return(NULL) }
 
   # ── 2. Surface-specific Elo (current post-match rating from lookup) ─────────
-  eloA <- get_player_surface_elo(playerA, surface, elo_surface_lookup)
-  eloB <- get_player_surface_elo(playerB, surface, elo_surface_lookup)
+  eloA <- get_player_surface_elo(playerA, surface, elo_surface_lookup, player_rank = rankA)
+  eloB <- get_player_surface_elo(playerB, surface, elo_surface_lookup, player_rank = rankB)
   elo_diff_surface <- eloA - eloB
 
   # ── 3. Tournament momentum: games dominance from completed matches ──────────

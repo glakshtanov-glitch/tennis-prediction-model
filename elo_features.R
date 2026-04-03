@@ -11,8 +11,9 @@
 
 compute_surface_elo <- function(
     matches_df,
-    K         = 32,
-    init_elo  = 1500
+    K            = 32,
+    init_elo     = 1500,
+    rank_init_df = NULL   # tibble(player, surface, rank) — rank at first surface appearance
 ) {
   # Sort strictly by date then match_num within tournament
   matches_sorted <- matches_df %>%
@@ -31,9 +32,26 @@ compute_surface_elo <- function(
   elo_winner_pre <- numeric(n)
   elo_loser_pre  <- numeric(n)
 
-  get_elo <- function(env, player) {
+  # Pre-split rank lookup by surface for O(1) access inside the loop
+  rank_by_surf <- if (!is.null(rank_init_df)) {
+    lapply(
+      split(rank_init_df, rank_init_df$surface),
+      function(d) setNames(d$rank, d$player)
+    )
+  } else NULL
+
+  rank_init_for <- function(player, surf) {
+    # Returns rank-based init elo, or init_elo if no rank data available.
+    # Formula: 1500 + 100 * (1 - log(rank) / log(500)), capped to [1400, 1700].
+    if (is.null(rank_by_surf) || is.null(rank_by_surf[[surf]])) return(init_elo)
+    r <- rank_by_surf[[surf]][player]
+    if (is.null(r) || is.na(r)) return(init_elo)
+    max(1400, min(1700, 1500 + 100 * (1 - log(r) / log(500))))
+  }
+
+  get_elo <- function(env, player, surf) {
     v <- env[[player]]
-    if (is.null(v)) init_elo else v
+    if (!is.null(v)) v else rank_init_for(player, surf)
   }
 
   for (i in seq_len(n)) {
@@ -49,8 +67,8 @@ compute_surface_elo <- function(
       next
     }
 
-    elo_w <- get_elo(env, winner)
-    elo_l <- get_elo(env, loser)
+    elo_w <- get_elo(env, winner, surf)
+    elo_l <- get_elo(env, loser,  surf)
 
     # Record pre-match ratings
     elo_winner_pre[i] <- elo_w
@@ -87,8 +105,10 @@ compute_surface_elo <- function(
 # or passed explicitly.
 
 get_player_surface_elo <- function(player, surface, elo_lookup,
-                                    matches_df = df_with_surface,
-                                    K = 32, init = 1500) {
+                                    matches_df  = df_with_surface,
+                                    K           = 32,
+                                    init        = 1500,
+                                    player_rank = NULL) {
   hist <- matches_df %>%
     filter(surface == !!surface,
            winner_name == player | loser_name == player) %>%
@@ -100,7 +120,13 @@ get_player_surface_elo <- function(player, surface, elo_lookup,
       elo_opp     = if_else(is_winner, elo_loser_pre,  elo_winner_pre)
     )
 
-  if (nrow(hist) == 0) return(init)
+  if (nrow(hist) == 0) {
+    # Use rank-based init for cold-start players when live rank is available
+    if (!is.null(player_rank) && !is.na(player_rank)) {
+      return(max(1400, min(1700, 1500 + 100 * (1 - log(player_rank) / log(500)))))
+    }
+    return(init)
+  }
 
   last      <- tail(hist, 1)
   exp_w     <- 1 / (1 + 10^((last$elo_opp - last$elo_self) / 400))

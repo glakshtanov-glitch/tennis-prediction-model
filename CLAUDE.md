@@ -83,7 +83,7 @@ All models are `tidymodels` logistic regression (`_glm/model_fit`). The primary 
 
 | Object | Formula | Notes |
 |--------|---------|-------|
-| `model_inter3_elo` | `outcome ~ log_rank_ratio + games_dom_diff + games_dom_x_underdog + elo_diff_surface` | **Primary.** Train 2015–2019. AUC 0.800, Brier 0.183 |
+| `model_inter3_elo` | `outcome ~ log_rank_ratio + games_dom_diff + games_dom_x_underdog + elo_diff_surface` | **Primary.** Train 2015–2019. AUC 0.801, Brier 0.183 |
 | `model_inter3` | `outcome ~ log_rank_ratio + games_dom_diff + games_dom_x_underdog` | Predecessor, no Elo. AUC 0.691 |
 | `model_wform` | `outcome ~ log_rank_ratio + wform_diff + surface` | Deprecated for live use |
 | `model_best` | `outcome ~ log_rank_ratio + surf_wr_diff + h2h_v3` | Parsimonious baseline |
@@ -91,9 +91,9 @@ All models are `tidymodels` logistic regression (`_glm/model_fit`). The primary 
 
 `model_inter3_elo` is saved as `model_inter3_elo.rds` in the project folder and also persisted in `tennis_project.RData`.
 
-**High-confidence betting rule** (final, validated 2020–2024, 94 bets):
+**High-confidence betting rule** (final, validated 2020–2024, 96 bets):
 - `edge_A > 0.15` AND `implied_A < 0.29` — **no upper edge cap**
-- Backtest: ROI +62.5%, win rate 38.3%, z=3.98, p<0.0001
+- Backtest: ROI +62.7%, win rate 38.5%, z=4.10, p<0.0001
 
 An upper cap at `edge < 0.50` was tested and rejected. The 13 bets with edge ≥ 0.50 were the *best-performing* subset (61.5% win, +171% ROI, avg odds 4.51). Although the model is overconfident in raw probability in this region (see Calibration findings), the market is *even more wrong* — the true edge over the market (observed win rate − implied) remains large and genuine. Removing high-edge bets discards signal, not noise.
 
@@ -118,13 +118,13 @@ Run `calibration.R` to reproduce. Key results on the 2020–2024 test set:
 
 **High-odds subset (implied < 0.29, n=378):** REL=0.0102. The model is overconfident in the upper deciles — it assigns 35–70% win probability to players the market prices at 5–29%. This is a **covariate shift** issue (extreme rank/Elo features in the tails) rather than a global flaw.
 
-**Betting zone (edge > 0.15, implied < 0.29, n=94):**
-- Mean predicted prob: 54.6% — mean observed win rate: 38.3%
-- Calibration error: +16.3pp (model overpredicts)
-- True edge over market (obs − implied): **+16.7pp** — this is the real number
-- Edge retention ratio: 50.6% (true edge / model-claimed edge)
+**Betting zone (edge > 0.15, implied < 0.29, n=96):**
+- Mean predicted prob: 54.6% — mean observed win rate: 38.5%
+- Calibration error: +16.1pp (model overpredicts)
+- True edge over market (obs − implied): **+16.9pp** — this is the real number
+- Edge retention ratio: ~50% (true edge / model-claimed edge)
 
-**Interpretation:** The 0.15 threshold functions as a *model-relative selector*, not an absolute probability guarantee. The model's inflated probabilities still identify genuine market mispricings. Do not adjust the threshold based on overconfidence alone — the true edge is statistically validated (z=3.98). Critically, the overconfidence *increases* with edge magnitude but so does the market's error: bets with edge ≥ 0.50 (n=13) had 61.5% observed win rate vs 15.8% implied — the market was more wrong, not less.
+**Interpretation:** The 0.15 threshold functions as a *model-relative selector*, not an absolute probability guarantee. The model's inflated probabilities still identify genuine market mispricings. Do not adjust the threshold based on overconfidence alone — the true edge is statistically validated (z=4.10). Critically, the overconfidence *increases* with edge magnitude but so does the market's error: bets with edge ≥ 0.50 (n=13) had 61.5% observed win rate vs 15.8% implied — the market was more wrong, not less.
 
 **Platt scaling** (see `calibration.R`, scaler saved as `platt_scaler.rds`): Fitted on 5-fold CV of train_inter. Platt coefficients A=0.987, B=0.000 — nearly identity. Does not improve REL or edge retention in the high-odds region; the miscalibration is localised to the feature-space tails where training data is sparse, not a global sigmoid compression issue. Do not apply Platt scaling to live predictions.
 
@@ -198,6 +198,8 @@ Key architectural choices and their empirical justification. Do not revisit with
 **Platt scaling not applied to live predictions:** Platt coefficients A=0.987, B=0.000 (near identity) when fitted on 5-fold CV of `train_inter`. The +16.3pp miscalibration in the betting zone is localised to the feature-space tails (extreme rank ratios and Elo differences sparse in training data) — a covariate-shift problem that a global affine recalibration cannot fix. No improvement in REL or edge retention in the high-odds region. Scaler saved as `platt_scaler.rds` but not applied.
 
 **Odds not used as a model feature:** `odds_all` covers only 2020–2024; the training period is 2015–2019 with no odds coverage. Including market odds as a model input would require either discarding 5 years of training data or training a model that cannot be evaluated on its own training set. Edge is computed post-prediction as `p̂ − implied`, keeping model signal and market signal cleanly separate.
+
+**Rank-based Elo initialisation adopted:** Instead of flat 1500 for every player's first match on a surface, new players are initialised at `1500 + 100 * (1 - log(rank) / log(500))` capped to [1400, 1700] — giving top-ranked players a head start (rank 1 → 1600, rank 500 → 1500, rank 750 → 1493). Tested in `elo_init_experiment.R` on the 2015–2024 dataset. Result: AUC 0.801 (+0.001), ROI +62.7% (+0.2pp), 96 bets (vs 94). Marginal but non-negative on both criteria; artefacts updated. The rank used is each player's ATP ranking at their first recorded match on that surface in the Sackmann dataset.
 
 ## Null result experiments
 

@@ -1,19 +1,34 @@
 # tracking.R
 # Live P&L tracking for the Monte-Carlo and subsequent ATP tournament deployments.
 # Provides log_bet() to append a single row to live_bets_log.csv from the R console.
-# Depends on: startup.R (for tidyverse)
+# Depends on: startup.R (for tidyverse), features.R (for normalize_name)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 BETS_LOG_PATH <- "live_bets_log.csv"
 
-# Column order used by live_bets_log.csv
-BETS_LOG_COLS <- c(
-  "date", "tournament", "playerA", "playerB", "surface", "round",
-  "signal_type", "model_prob", "implied_prob", "edge",
-  "odds_taken", "bookmaker", "stake", "result", "profit",
-  "cumulative_profit", "notes"
-)
+# ── Internal helpers ───────────────────────────────────────────────────────────
+
+# All three public functions read the log the same way — centralise here.
+.read_bets_log <- function(log_path) {
+  read_csv(log_path, col_types = cols(.default = "c"), show_col_types = FALSE)
+}
+
+# Recompute cumulative_profit for the full log from scratch (authoritative).
+# Treats pending bets (profit = NA) as 0 in the running total — consistent
+# with update_result() behaviour when results arrive out of order.
+.recompute_cumsum <- function(log) {
+  profits <- as.numeric(log$profit)
+  log$cumulative_profit <- as.character(cumsum(ifelse(is.na(profits), 0, profits)))
+  log
+}
+
+# Compute profit for a single resolved bet.
+.compute_profit <- function(result, odds_taken, stake) {
+  if (result == "W")    round((odds_taken - 1) * stake, 4)
+  else if (result == "L") -stake
+  else 0
+}
 
 # ── log_bet() ─────────────────────────────────────────────────────────────────
 # Append one bet to live_bets_log.csv.
@@ -56,43 +71,17 @@ log_bet <- function(playerA,
                     date         = Sys.Date(),
                     log_path     = BETS_LOG_PATH) {
 
-  # ── Validate signal_type ────────────────────────────────────────────────────
   if (!signal_type %in% c("HC", "SS", "both")) {
     stop("signal_type must be one of: 'HC', 'SS', 'both'")
   }
-
-  # ── Validate result if provided ─────────────────────────────────────────────
   if (!is.na(result) && !result %in% c("W", "L", "void")) {
     stop("result must be 'W', 'L', 'void', or NA")
   }
 
-  # ── Compute profit from result ───────────────────────────────────────────────
   # profit = (odds_taken - 1) * stake on win, -stake on loss, 0 on void
-  profit <- if (is.na(result)) {
-    NA_real_
-  } else if (result == "W") {
-    round((odds_taken - 1) * stake, 4)
-  } else if (result == "L") {
-    -stake
-  } else {  # void
-    0
-  }
+  profit <- if (is.na(result)) NA_real_
+            else .compute_profit(result, as.numeric(odds_taken), as.numeric(stake))
 
-  # ── Compute cumulative profit from existing log ──────────────────────────────
-  cumulative_profit <- tryCatch({
-    if (file.exists(log_path)) {
-      existing  <- read_csv(log_path, col_types = cols(.default = "c"), show_col_types = FALSE)
-      prev_sum  <- sum(as.numeric(existing$profit), na.rm = TRUE)
-      if (!is.na(profit)) prev_sum + profit else NA_real_
-    } else {
-      if (!is.na(profit)) profit else NA_real_
-    }
-  }, error = function(e) {
-    cat(sprintf("  [warn] Could not compute cumulative_profit: %s\n", e$message))
-    NA_real_
-  })
-
-  # ── Build the new row ────────────────────────────────────────────────────────
   new_row <- tibble(
     date              = as.character(date),
     tournament        = as.character(tournament),
@@ -109,17 +98,20 @@ log_bet <- function(playerA,
     stake             = as.numeric(stake),
     result            = as.character(result),
     profit            = profit,
-    cumulative_profit = cumulative_profit,
+    cumulative_profit = NA_real_,   # filled by .recompute_cumsum() below
     notes             = as.character(notes)
   )
 
-  # ── Write to CSV (create with header if absent, otherwise append) ────────────
   tryCatch({
     if (!file.exists(log_path)) {
+      new_row$cumulative_profit <- if (!is.na(profit)) profit else NA_real_
       write_csv(new_row, log_path)
       cat(sprintf("[log_bet] Created %s — first entry logged.\n", log_path))
     } else {
+      # Append first, then recompute cumsum across full log for consistency.
       write_csv(new_row, log_path, append = TRUE, col_names = FALSE)
+      full_log <- .recompute_cumsum(.read_bets_log(log_path))
+      write_csv(full_log, log_path)
       cat(sprintf("[log_bet] Appended to %s\n", log_path))
     }
   }, error = function(e) {
@@ -132,11 +124,12 @@ log_bet <- function(playerA,
 # ── update_result() ───────────────────────────────────────────────────────────
 # Fill in the result and profit for a previously logged bet (matched by
 # playerA + playerB + date). Use this after the match finishes.
+# Player names are normalised before matching to handle accent variants.
 #
 # Arguments:
-#   playerA   : character — must match the logged row exactly
-#   playerB   : character
+#   playerA   : character — must match the logged row (accent-insensitive)
 #   result    : "W", "L", or "void"
+#   playerB   : character — optional, supply to disambiguate same-day duplicates
 #   date      : Date — defaults to today
 #   log_path  : path to the CSV log
 
@@ -153,42 +146,48 @@ update_result <- function(playerA,
     stop(sprintf("Log file not found: %s", log_path))
   }
 
-  log <- read_csv(log_path, col_types = cols(.default = "c"), show_col_types = FALSE)
+  log <- .read_bets_log(log_path)
 
-  # Identify matching row(s)
-  mask <- log$playerA == playerA & log$date == as.character(date)
-  if (!is.null(playerB)) mask <- mask & log$playerB == playerB
+  # Normalise names for accent-insensitive matching
+  pA_norm     <- normalize_name(playerA)
+  log_pA_norm <- normalize_name(log$playerA)
+
+  mask <- log_pA_norm == pA_norm & log$date == as.character(date)
+  if (!is.null(playerB)) {
+    pB_norm     <- normalize_name(playerB)
+    log_pB_norm <- normalize_name(log$playerB)
+    mask <- mask & log_pB_norm == pB_norm
+  }
 
   n_match <- sum(mask, na.rm = TRUE)
   if (n_match == 0) {
     cat(sprintf("[warn] No matching row found for %s on %s\n", playerA, date))
     return(invisible(NULL))
   }
+
+  idx <- which(mask)
   if (n_match > 1) {
     cat(sprintf("[warn] %d rows matched — updating the first. Supply playerB to disambiguate.\n", n_match))
-    mask <- which(mask)[1]
+    idx <- idx[1]
   }
 
-  # Compute profit
-  odds_taken <- as.numeric(log$odds_taken[mask])
-  stake      <- as.numeric(log$stake[mask])
+  odds_taken <- as.numeric(log$odds_taken[idx])
+  stake      <- as.numeric(log$stake[idx])
+  profit     <- .compute_profit(result, odds_taken, stake)
 
-  profit <- if (result == "W")    round((odds_taken - 1) * stake, 4)
-            else if (result == "L") -stake
-            else 0
+  log$result[idx] <- result
+  log$profit[idx] <- as.character(profit)
+  log <- .recompute_cumsum(log)
 
-  log$result[mask] <- result
-  log$profit[mask] <- as.character(profit)
+  tryCatch(
+    write_csv(log, log_path),
+    error = function(e) cat(sprintf("[ERROR] Could not write to %s: %s\n", log_path, e$message))
+  )
 
-  # Recompute all cumulative_profit values in order
-  profits <- as.numeric(log$profit)
-  log$cumulative_profit <- as.character(cumsum(ifelse(is.na(profits), 0, profits)))
-
-  write_csv(log, log_path)
   cat(sprintf("[update_result] Updated %s vs %s → %s (profit: %+.2f units)\n",
               playerA, if (!is.null(playerB)) playerB else "?", result, profit))
 
-  invisible(log[mask, ])
+  invisible(log[idx, ])
 }
 
 # ── pnl_summary() ────────────────────────────────────────────────────────────
@@ -200,7 +199,7 @@ pnl_summary <- function(log_path = BETS_LOG_PATH) {
     return(invisible(NULL))
   }
 
-  log <- read_csv(log_path, col_types = cols(.default = "c"), show_col_types = FALSE) %>%
+  log <- .read_bets_log(log_path) %>%
     mutate(
       profit     = as.numeric(profit),
       odds_taken = as.numeric(odds_taken),
@@ -236,11 +235,11 @@ pnl_summary <- function(log_path = BETS_LOG_PATH) {
   by_signal <- settled %>%
     group_by(signal_type) %>%
     summarise(
-      n        = n(),
-      wins     = sum(result == "W"),
-      profit   = sum(profit),
-      roi      = profit / sum(stake),
-      .groups  = "drop"
+      n      = n(),
+      wins   = sum(result == "W"),
+      profit = sum(profit),
+      roi    = profit / sum(stake),
+      .groups = "drop"
     )
   print(as.data.frame(by_signal), row.names = FALSE)
   cat("\n")
@@ -252,6 +251,7 @@ pnl_summary <- function(log_path = BETS_LOG_PATH) {
 
 if (FALSE) {
   source("startup.R")
+  source("features.R")
   source("tracking.R")
 
   # Log a bet at the time of placing it (result unknown yet)
