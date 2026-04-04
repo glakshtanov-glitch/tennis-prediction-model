@@ -21,12 +21,47 @@ fetch_live_rankings <- function(api_key = RAPIDAPI_KEY) {
     `x-rapidapi-host` = "tennisapi1.p.rapidapi.com",
     `x-rapidapi-key`  = api_key
   ))
-  data <- fromJSON(content(response, "text", encoding = "UTF-8"), flatten = TRUE)
+
+  status <- status_code(response)
+  body   <- content(response, "text", encoding = "UTF-8")
+
+  if (status != 200) {
+    cat(sprintf("[fetch_live_rankings] HTTP %d: %s\n", status,
+                substr(body, 1, 200)))
+    return(.rankings_fallback())
+  }
+
+  data <- tryCatch(
+    fromJSON(body, flatten = TRUE),
+    error = function(e) {
+      cat(sprintf("[fetch_live_rankings] JSON parse error: %s\n", e$message))
+      cat(sprintf("  Raw body (first 200): %s\n", substr(body, 1, 200)))
+      NULL
+    }
+  )
+
+  if (is.null(data) || is.null(data$rankings)) {
+    cat(sprintf("[fetch_live_rankings] Unexpected response structure. Keys: %s\n",
+                paste(names(data), collapse = ", ")))
+    cat(sprintf("  Raw body (first 200): %s\n", substr(body, 1, 200)))
+    return(.rankings_fallback())
+  }
+
   data$rankings %>%
     transmute(
       player    = normalize_name(team.name),
       live_rank = ranking
     )
+}
+
+# Falls back to the live_rankings object saved in tennis_project.RData.
+.rankings_fallback <- function() {
+  if (exists("live_rankings") && !is.null(live_rankings) && nrow(live_rankings) > 0) {
+    cat("[fetch_live_rankings] Using cached live_rankings from tennis_project.RData\n")
+    return(live_rankings)
+  }
+  cat("[fetch_live_rankings] No cached rankings available — returning NULL\n")
+  NULL
 }
 
 # ── Live match schedule ────────────────────────────────────────────────────────

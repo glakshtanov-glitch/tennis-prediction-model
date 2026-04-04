@@ -20,7 +20,11 @@ message("Environment loaded from: ", RDATA_PATH)
 message("Objects in workspace: ", length(ls()))
 
 # ── API keys ───────────────────────────────────────────────────────────────────
-# Store keys in .Renviron (RAPIDAPI_KEY=..., ODDS_API_KEY=...) and retrieve here.
+# .Renviron is not always auto-loaded when R is invoked via Rscript from certain
+# shells (e.g. Git Bash on Windows). Force-load it so keys are always available.
+renviron_path <- file.path(path.expand("~"), ".Renviron")
+if (file.exists(renviron_path)) readRenviron(renviron_path)
+
 RAPIDAPI_KEY <- Sys.getenv("RAPIDAPI_KEY")
 ODDS_API_KEY <- Sys.getenv("ODDS_API_KEY")
 
