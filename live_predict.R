@@ -135,6 +135,10 @@ SS_MIN_STREAK_LIVE <- 2L    # consecutive straight-set wins to trigger SS signal
 predict_match <- function(playerA, playerB, surface, tournament_matches,
                            odds_A = NA, odds_B = NA) {
 
+  # Normalise accents so input names match the ASCII-normalised live_rankings
+  playerA <- normalize_name(playerA)
+  playerB <- normalize_name(playerB)
+
   # ── 1. Rankings ─────────────────────────────────────────────────────────────
   rankA <- live_rankings %>% filter(player == playerA) %>% pull(live_rank)
   rankB <- live_rankings %>% filter(player == playerB) %>% pull(live_rank)
