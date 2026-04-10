@@ -21,9 +21,13 @@ message("Objects in workspace: ", length(ls()))
 
 # ── API keys ───────────────────────────────────────────────────────────────────
 # .Renviron is not always auto-loaded when R is invoked via Rscript from certain
-# shells (e.g. Git Bash on Windows). Force-load it so keys are always available.
-renviron_path <- file.path(path.expand("~"), ".Renviron")
-if (file.exists(renviron_path)) readRenviron(renviron_path)
+# shells (e.g. Git Bash on Windows). Force-load from both known locations so
+# keys are always available regardless of working directory or shell context.
+for (.rv in c(file.path(path.expand("~"), ".Renviron"),
+              "C:/Users/User/OneDrive/Documents/.Renviron")) {
+  if (file.exists(.rv)) readRenviron(.rv)
+}
+rm(.rv)
 
 RAPIDAPI_KEY <- Sys.getenv("RAPIDAPI_KEY")
 ODDS_API_KEY <- Sys.getenv("ODDS_API_KEY")

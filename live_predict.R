@@ -135,13 +135,30 @@ SS_MIN_STREAK_LIVE <- 2L    # consecutive straight-set wins to trigger SS signal
 predict_match <- function(playerA, playerB, surface, tournament_matches,
                            odds_A = NA, odds_B = NA) {
 
-  # Normalise accents so input names match the ASCII-normalised live_rankings
-  playerA <- normalize_name(playerA)
-  playerB <- normalize_name(playerB)
-
   # ── 1. Rankings ─────────────────────────────────────────────────────────────
-  rankA <- live_rankings %>% filter(player == playerA) %>% pull(live_rank)
-  rankB <- live_rankings %>% filter(player == playerB) %>% pull(live_rank)
+  .rank_lookup <- function(name, rankings) {
+    # Exact match first, then accent-stripped fallback
+    r <- rankings %>% filter(player == name) %>% pull(live_rank)
+    if (length(r) > 0) return(list(rank = r, name = name))
+    name_ascii <- stri_trans_general(name, "Latin-ASCII")
+    r <- rankings %>%
+      filter(stri_trans_general(player, "Latin-ASCII") == name_ascii) %>%
+      pull(live_rank)
+    if (length(r) > 0) {
+      canonical <- rankings %>%
+        filter(stri_trans_general(player, "Latin-ASCII") == name_ascii) %>%
+        pull(player)
+      return(list(rank = r, name = canonical[1]))
+    }
+    list(rank = integer(0), name = name)
+  }
+
+  resA <- .rank_lookup(playerA, live_rankings)
+  resB <- .rank_lookup(playerB, live_rankings)
+  playerA <- resA$name   # use canonical stored name for Elo lookup
+  playerB <- resB$name
+  rankA   <- resA$rank
+  rankB   <- resB$rank
 
   if (length(rankA) == 0) { cat("Ranking not found:", playerA, "\n"); return(NULL) }
   if (length(rankB) == 0) { cat("Ranking not found:", playerB, "\n"); return(NULL) }

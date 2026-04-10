@@ -109,9 +109,28 @@ get_player_surface_elo <- function(player, surface, elo_lookup,
                                     K           = 32,
                                     init        = 1500,
                                     player_rank = NULL) {
+  player_norm <- stri_trans_general(player, "Latin-ASCII")
+
+  # Fast exact match first; fall back to accent-stripped comparison only if needed
   hist <- matches_df %>%
     filter(surface == !!surface,
-           winner_name == player | loser_name == player) %>%
+           winner_name == player | loser_name == player)
+
+  if (nrow(hist) == 0 && player_norm != player) {
+    hist <- matches_df %>%
+      filter(surface == !!surface) %>%
+      filter(stri_trans_general(winner_name, "Latin-ASCII") == player_norm |
+             stri_trans_general(loser_name,  "Latin-ASCII") == player_norm)
+    # Use the canonical stored name for subsequent comparisons
+    if (nrow(hist) > 0) {
+      player <- if (any(stri_trans_general(hist$winner_name, "Latin-ASCII") == player_norm))
+                  hist$winner_name[stri_trans_general(hist$winner_name, "Latin-ASCII") == player_norm][1]
+                else
+                  hist$loser_name[stri_trans_general(hist$loser_name, "Latin-ASCII") == player_norm][1]
+    }
+  }
+
+  hist <- hist %>%
     arrange(tourney_date, match_num) %>%
     left_join(elo_lookup, by = "match_id") %>%
     mutate(
