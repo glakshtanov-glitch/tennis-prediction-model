@@ -12,6 +12,10 @@
 
 # CSV data files — raw data and backtest outputs
 *.csv
+# Exceptions: Python handoff data dumps
+!train_inter.csv
+!test_inter.csv
+!odds_2020_2024.csv
 
 # Plots / generated images — regenerate with calibration.R
 *.png
